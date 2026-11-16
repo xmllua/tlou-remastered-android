@@ -18,17 +18,54 @@ mkdir -p "$prefix" "$src" "$bld"
 J=${TLOU_JOBS:-2}
 run() { "$@"; }
 
-fetch() { # name url archive-extension
-    local dir=$src/$1
-    [[ -d $dir ]] && return
+download_one() { # url dest -> 0 on success, resuming a partial file when possible
+    local url=$1 dest=$2
+    # Resume first, so a dropped mobile link does not restart a large archive.
+    curl -fL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 1800 \
+        --speed-limit 1024 --speed-time 60 -C - -o "$dest" "$url" 2>/dev/null && return 0
+    # Resume can fail outright when a mirror ignores Range; retry from scratch.
+    rm -f -- "$dest"
+    curl -fL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 1800 \
+        --speed-limit 1024 --speed-time 60 -o "$dest" "$url" 2>/dev/null
+}
+
+fetch() { # name url [fallback-url...]
+    local name=$1 dir=$src/$1 tar=$src/$1.tar
+    shift
+    [[ -d $dir ]] && return 0
     rm -rf -- "$dir.tmp"
-    local url="$2"
-    if [[ "$1" == "ffmpeg-7.1.5" ]]; then
-        # ffmpeg.org timed out in GitHub Actions; the same upstream n7.1.5 source tag.
-        url="https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n7.1.5.tar.gz"
-    fi
-    curl --retry 5 --retry-delay 3 --connect-timeout 12 --max-time 180 -fsSL "$url" -o "$src/$1.tar" && mkdir -p "$dir.tmp" && tar --no-same-owner -xf "$src/$1.tar" -C "$dir.tmp" --strip-components=1 \
-        && mv "$dir.tmp" "$dir" && rm "$src/$1.tar"
+
+    local candidates=()
+    local url
+    for url in "$@"; do
+        candidates+=("$url")
+        # GitHub releases and archives are also reachable through the documented
+        # proxy endpoints when the direct route stalls. Kept opt-in via TLOU_DL_PROXY
+        # first, then a short list of public mirrors, so CI keeps using the direct URL.
+        case $url in
+            https://github.com/*)
+                [[ -n ${TLOU_DL_PROXY:-} ]] && candidates+=("${TLOU_DL_PROXY%/}/$url")
+                candidates+=("https://ghfast.top/$url" "https://ghproxy.net/$url" "https://gh-proxy.com/$url")
+                ;;
+        esac
+    done
+
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        echo "fetch $name <- $candidate"
+        if download_one "$candidate" "$tar"; then
+            # A truncated archive still passes curl's exit code on some mirrors.
+            if tar -tf "$tar" >/dev/null 2>&1; then
+                mkdir -p "$dir.tmp" \
+                    && tar --no-same-owner -xf "$tar" -C "$dir.tmp" --strip-components=1 \
+                    && mv "$dir.tmp" "$dir" && rm -f -- "$tar" && return 0
+            fi
+            echo "  archive from $candidate is incomplete; trying the next source" >&2
+        fi
+        rm -f -- "$tar"
+    done
+    echo "fetch $name failed from every source" >&2
+    return 1
 }
 cm() { # name source-dir extra cmake args...
     local name=$1 sdir=$2; shift 2
@@ -49,7 +86,9 @@ fetch xxhash-0.8.3 https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.3.t
 fetch miniz-3.1.2 https://github.com/richgel999/miniz/archive/refs/tags/3.1.2.tar.gz
 fetch Vulkan-Headers-1.4.363 https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.363.tar.gz
 fetch SPIRV-Headers-1.4.309 https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/vulkan-sdk-1.4.309.0.tar.gz
-fetch ffmpeg-7.1.5 https://ffmpeg.org/releases/ffmpeg-7.1.5.tar.xz
+# ffmpeg.org and the GitHub mirror were both reachable from the device; either may
+# stall, so hand fetch both instead of preferring one.
+fetch ffmpeg-7.1.5 https://ffmpeg.org/releases/ffmpeg-7.1.5.tar.xz https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n7.1.5.tar.gz
 
 # Header-only: vulkan-hpp (the NDK ships Vulkan 1.3.275 C headers without it) and SPIR-V.
 cm vulkan-headers "$src/Vulkan-Headers-1.4.363"
