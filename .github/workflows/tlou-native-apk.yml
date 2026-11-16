@@ -164,12 +164,39 @@ jobs:
       - name: Verify FPS sampling and resume behavior
         if: ${{ !contains(github.event.head_commit.message, '[native-only]') }}
         run: bash android/bionic/test_fps.sh
+      # The keystore is not committed (it never should be), so it lives only in the
+      # Actions cache. When the cache has never been populated the restore step is a
+      # silent no-op, which left package_apk.sh refusing to sign (exit 8). Create the
+      # identity exactly once here; the cache post-step then pins it for every later
+      # build so update continuity is preserved from the first success onwards.
       - name: Restore signing identity used by existing installations
+        id: signing
         if: ${{ !contains(github.event.head_commit.message, '[native-only]') }}
         uses: actions/cache@v4
         with:
           path: out/android-bionic/experimental-development.jks
           key: tlou-development-signing-v2
+      - name: Create signing identity when the cache is empty
+        if: ${{ !contains(github.event.head_commit.message, '[native-only]') && steps.signing.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          key=out/android-bionic/experimental-development.jks
+          mkdir -p out/android-bionic
+          if [[ -s "$key" ]]; then
+            echo "Signing identity already present; leaving it untouched"
+            exit 0
+          fi
+          echo "No cached signing identity; generating the v2 development key"
+          keytool="$JAVA_HOME/bin/keytool"
+          [[ -x "$keytool" ]] || keytool="$(command -v keytool)"
+          "$keytool" -genkeypair -noprompt \
+            -keystore "$key" -storetype JKS -alias tlou-bionic \
+            -keyalg RSA -keysize 4096 -validity 10000 \
+            -storepass TLOU-Bionic-development \
+            -keypass TLOU-Bionic-development \
+            -dname "CN=TLOU-Bionic-Android, OU=Daedalus, O=xmllua, C=US"
+          "$keytool" -list -keystore "$key" -storepass TLOU-Bionic-development
+          echo "Generated this key once; the cache post-step will pin it for later builds"
       - name: Assemble and sign actual TLOU Bionic APK
         if: ${{ !contains(github.event.head_commit.message, '[native-only]') }}
         shell: bash -el {0}
