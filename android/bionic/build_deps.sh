@@ -70,13 +70,17 @@ fetch() { # name url [fallback-url...]
 cm() { # name source-dir extra cmake args...
     local name=$1 sdir=$2; shift 2
     [[ -f $prefix/.done-$name ]] && return
+    echo "==> configuring $name"
     cmake -S "$sdir" -B "$bld/$name" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
         -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$api -DANDROID_STL=c++_shared \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        -DCMAKE_PREFIX_PATH="$prefix" -DCMAKE_FIND_ROOT_PATH="$prefix" "$@" >/dev/null
+        -DCMAKE_PREFIX_PATH="$prefix" -DCMAKE_FIND_ROOT_PATH="$prefix" "$@" >"$bld/$name.configure.log" 2>&1 \
+        || { echo "cmake configure failed for $name:" >&2; tail -30 "$bld/$name.configure.log" >&2; exit 1; }
+    echo "==> building $name"
     run cmake --build "$bld/$name" -j "$J" >"$bld/$name.log" 2>&1 || { tail -30 "$bld/$name.log" >&2; exit 1; }
     cmake --install "$bld/$name" >/dev/null
     touch "$prefix/.done-$name"
+    echo "==> installed $name"
 }
 
 fetch fmt-12.1.0 https://github.com/fmtlib/fmt/archive/refs/tags/12.1.0.tar.gz
@@ -104,18 +108,31 @@ cm miniz "$src/miniz-3.1.2" -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DBUILD
 # FFmpeg (avplayer/videodec): static, PIC, no programs, only built-in codecs/demuxers.
 if [[ ! -f $prefix/.done-ffmpeg ]]; then
     tc=$prebuilt
+    cc="$tc/bin/aarch64-linux-android$api-clang"
+    [[ -x $cc ]] || { echo "ffmpeg: missing cross compiler $cc" >&2; exit 1; }
+    [[ -x $src/ffmpeg-7.1.5/configure ]] || { echo "ffmpeg: missing configure script" >&2; exit 1; }
+    echo "==> configuring ffmpeg (cc=$(basename "$cc"))"
     mkdir -p "$bld/ffmpeg" && pushd "$bld/ffmpeg" >/dev/null
-    "$src/ffmpeg-7.1.5/configure" --prefix="$prefix" --enable-cross-compile --target-os=android --arch=aarch64 \
-        --cc="$tc/bin/aarch64-linux-android$api-clang" --cxx="$tc/bin/aarch64-linux-android$api-clang++" \
+    if ! "$src/ffmpeg-7.1.5/configure" --prefix="$prefix" --enable-cross-compile --target-os=android --arch=aarch64 \
+        --cc="$cc" --cxx="$tc/bin/aarch64-linux-android$api-clang++" \
         --ar="$tc/bin/llvm-ar" --ranlib="$tc/bin/llvm-ranlib" --strip="$tc/bin/llvm-strip" --nm="$tc/bin/llvm-nm" \
         --enable-static --disable-shared --enable-pic --disable-programs --disable-doc --disable-debug \
-        --disable-avdevice --disable-avfilter --disable-network --disable-autodetect --disable-mediacodec --disable-jni >"$bld/ffmpeg-configure.log" 2>&1 \
-        || { tail -30 "$bld/ffmpeg-configure.log" >&2; exit 1; }
-    run make -j"$J" >"$bld/ffmpeg.log" 2>&1 || { tail -30 "$bld/ffmpeg.log" >&2; exit 1; }
+        --disable-avdevice --disable-avfilter --disable-network --disable-autodetect --disable-mediacodec --disable-jni \
+        >"$bld/ffmpeg-configure.log" 2>&1; then
+        echo "ffmpeg configure exited non-zero; last lines of $bld/ffmpeg-configure.log:" >&2
+        tail -40 "$bld/ffmpeg-configure.log" >&2
+        # configure creates the log lazily; an empty log with a fast failure means it
+        # never started, so say so instead of printing nothing.
+        [[ -s $bld/ffmpeg-configure.log ]] || echo "(configure produced no output at all)" >&2
+        exit 1
+    fi
+    echo "==> building ffmpeg"
+    run make -j"$J" >"$bld/ffmpeg.log" 2>&1 || { tail -40 "$bld/ffmpeg.log" >&2; exit 1; }
     make install >/dev/null
     # configure's Android target links libandroid/libmediandk for MediaCodec/JNI, both disabled here.
     sed -i 's/ -landroid -lmediandk//' "$prefix"/lib/pkgconfig/libavutil.pc
     popd >/dev/null
     touch "$prefix/.done-ffmpeg"
+    echo "==> installed ffmpeg"
 fi
 echo "Bionic deps in $prefix"
