@@ -6,6 +6,15 @@ import re
 import subprocess
 
 
+def prebuilt(ndk):
+    """Resolve the NDK host toolchain directory (linux-x86_64 or linux-arm64)."""
+    helper = Path(__file__).resolve().parent/'ndk_prebuilt.sh'
+    out = subprocess.run(['bash', str(helper), str(ndk)], capture_output=True, text=True)
+    if out.returncode != 0:
+        raise SystemExit(out.stderr.strip() or f'No NDK host prebuilt under {ndk}')
+    return Path(out.stdout.strip())
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--ndk', type=Path, required=True)
@@ -13,7 +22,7 @@ def main():
     p.add_argument('--root', type=Path, default=Path('out/android-bionic'))
     p.add_argument('--complete', action='store_true', help='Require Python, PKG and patch-validator modules too')
     args = p.parse_args()
-    llvm = args.ndk/'toolchains/llvm/prebuilt/linux-x86_64'
+    llvm = prebuilt(args.ndk)
     system = llvm/f'sysroot/usr/lib/aarch64-linux-android/{args.api}'
     allowed = {'libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libnativewindow.so',
                'libc++_shared.so', 'libgow3cpu.so', 'libgow3gpu.so', 'libpython3.13.so', 'libz.so', 'libvulkan.so'}

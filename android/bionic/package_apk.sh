@@ -8,7 +8,8 @@ out=$root/out/android-bionic
 ndk="$TLOU_NDK"
 if [[ -z "$ndk" ]]; then ndk="$ANDROID_NDK_HOME"; fi
 [[ -n "$ndk" ]] || { echo "Set TLOU_NDK or ANDROID_NDK_HOME" >&2; exit 2; }
-llvm=$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin
+. "$(dirname "$0")/ndk_prebuilt.sh"
+llvm=$(ndk_prebuilt "$ndk")/bin || { echo "No NDK host prebuilt under $ndk" >&2; exit 1; }
 sdk="$ANDROID_HOME"
 if [[ -z "$sdk" ]]; then sdk="$ANDROID_SDK_ROOT"; fi
 [[ -n "$sdk" ]] || { echo "Set ANDROID_HOME or ANDROID_SDK_ROOT" >&2; exit 2; }

@@ -10,7 +10,8 @@ export TLOU_NDK="$ndk"
 api=${TLOU_ANDROID_API:-30}
 out=$root/out/android-bionic
 prefix=$root/.local-deps/android/bionic-prefix
-llvm=$ndk/toolchains/llvm/prebuilt/linux-x86_64
+. "$(dirname "$0")/ndk_prebuilt.sh"
+llvm=$(ndk_prebuilt "$ndk") || { echo "No NDK host prebuilt under $ndk" >&2; exit 1; }
 if [[ ${1:-} != --link-only ]]; then
   bash android/bionic/build_deps.sh
   bash android/bionic/build_fex.sh

@@ -12,6 +12,8 @@ ndk=${TLOU_NDK:-${ANDROID_NDK_HOME:-$root/sdk/ndk/29.0.14206865}}
 api=${TLOU_ANDROID_API:-30}
 prefix=$root/bionic-prefix src=$root/bionic-src bld=$root/bionic-build
 [[ -f $ndk/build/cmake/android.toolchain.cmake ]] || { echo "No NDK: $ndk" >&2; exit 1; }
+. "$(dirname -- "$0")/ndk_prebuilt.sh"
+prebuilt=$(ndk_prebuilt "$ndk") || { echo "No NDK host prebuilt under $ndk" >&2; exit 1; }
 mkdir -p "$prefix" "$src" "$bld"
 J=${TLOU_JOBS:-2}
 run() { "$@"; }
@@ -62,7 +64,7 @@ cm xxhash "$src/xxhash-0.8.3/cmake_unofficial" -DBUILD_SHARED_LIBS=OFF -DXXHASH_
 cm miniz "$src/miniz-3.1.2" -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DINSTALL_PROJECT=ON
 # FFmpeg (avplayer/videodec): static, PIC, no programs, only built-in codecs/demuxers.
 if [[ ! -f $prefix/.done-ffmpeg ]]; then
-    tc=$ndk/toolchains/llvm/prebuilt/linux-x86_64
+    tc=$prebuilt
     mkdir -p "$bld/ffmpeg" && pushd "$bld/ffmpeg" >/dev/null
     "$src/ffmpeg-7.1.5/configure" --prefix="$prefix" --enable-cross-compile --target-os=android --arch=aarch64 \
         --cc="$tc/bin/aarch64-linux-android$api-clang" --cxx="$tc/bin/aarch64-linux-android$api-clang++" \

@@ -10,7 +10,9 @@ prefix=$root/.local-deps/android/bionic-prefix
 headers=${TLOU_BIONIC_HEADERS:-$root/.local-deps/root/usr}
 out=$root/out/android-bionic
 build=${TLOU_BIONIC_GPU_BUILD:-$out/gpu}
-atomic=$("$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android$api-clang" -print-file-name=libatomic.a)
+. "$(dirname "$0")/ndk_prebuilt.sh"
+prebuilt=$(ndk_prebuilt "$ndk") || { echo "No NDK host prebuilt under $ndk" >&2; exit 1; }
+atomic=$("$prebuilt/bin/aarch64-linux-android$api-clang" -print-file-name=libatomic.a)
 [[ -f $atomic ]] || { echo 'NDK ARM64 libatomic.a is missing' >&2; exit 1; }
 [[ -f $prefix/.done-ffmpeg ]] || { echo 'Run android/bionic/build_deps.sh first' >&2; exit 1; }
 unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH CMAKE_PREFIX_PATH

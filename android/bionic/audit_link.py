@@ -8,6 +8,14 @@ import shlex
 import subprocess
 
 
+def prebuilt(ndk):
+    """Resolve the NDK host toolchain directory (linux-x86_64 or linux-arm64)."""
+    helper = Path(__file__).resolve().parent/'ndk_prebuilt.sh'
+    out = subprocess.run(['bash', str(helper), str(ndk)], capture_output=True, text=True)
+    if out.returncode != 0:
+        raise SystemExit(out.stderr.strip() or f'No NDK host prebuilt under {ndk}')
+    return Path(out.stdout.strip())
+
 def audit(fragments, build, roots, readelf, ndk=None):
     build=Path(build).resolve()
     roots=[Path(p).resolve() for p in roots]
@@ -60,7 +68,7 @@ def main():
     target=next(t for t in model['configurations'][0]['targets'] if t['name']=='gow3gpu')
     data=json.loads((reply/target['jsonFile']).read_text())
     n=audit(data['link']['commandFragments'],a.build,[a.prefix,a.ndk],
-            a.ndk/'toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf',a.ndk)
+            prebuilt(a.ndk)/'bin/llvm-readelf',a.ndk)
     print(f'CMake link audit: {n} target libraries (ARM64/NDK); no host library/search path')
 
 if __name__=='__main__':main()

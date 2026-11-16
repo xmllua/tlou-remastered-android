@@ -11,7 +11,8 @@ build=$root/.local-deps/android/bionic-build/python-host-isolated-v1
 cross=$root/.local-deps/android/bionic-build/python-android-isolated-v1
 out=$root/out/android-bionic/python
 j=${TLOU_JOBS:-4}
-llvm=$ndk/toolchains/llvm/prebuilt/linux-x86_64
+. "$(dirname "$0")/ndk_prebuilt.sh"
+llvm=$(ndk_prebuilt "$ndk") || { echo "No NDK host prebuilt under $ndk" >&2; exit 1; }
 clean=(env -i "PATH=/usr/bin:/bin:$llvm/bin" "HOME=$HOME" LC_ALL=C CONFIG_SITE=/dev/null)
 if [[ ! -f $src/configure ]]; then
     mkdir -p "$src"

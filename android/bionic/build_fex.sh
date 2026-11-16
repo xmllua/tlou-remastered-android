@@ -8,6 +8,8 @@ ndk=${TLOU_NDK:-${ANDROID_NDK_HOME:-}}
 : "${ndk:?Set TLOU_NDK or ANDROID_NDK_HOME}"
 api=${TLOU_ANDROID_API:-30}
 output=${TLOU_BIONIC_OUT:-$root/out/android-bionic}
+. "$(dirname "$0")/ndk_prebuilt.sh"
+prebuilt=$(ndk_prebuilt "$ndk") || { echo "No NDK host prebuilt under $ndk" >&2; exit 1; }
 fex=${TLOU_FEX_SOURCE:-$root/.local-deps/FEX}
 fex_ref=fb925d6fc5cc8576bf0f9ae6978fc6d912485593
 if [[ ! -f "$fex/CMakeLists.txt" ]]; then
@@ -39,5 +41,5 @@ cmake -S "$fex" -B "$output/fex" -G Ninja \
 cmake --build "$output/fex" --target gow3cpu --parallel "${TLOU_JOBS:-2}"
 mkdir -p "$output/lib"
 cp "$output/fex/libgow3cpu.so" "$output/lib/libgow3cpu.so"
-cp "$ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$output/lib/"
+cp "$prebuilt/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$output/lib/"
 echo "Built TLOU guest CPU FEX bridge (without TLOU GPU or APK): $output/lib/libgow3cpu.so"

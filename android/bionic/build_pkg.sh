@@ -10,9 +10,11 @@ if [[ ! -d $src/.git ]]; then git clone --no-checkout https://github.com/videobi
 git -C "$src" fetch --depth=1 origin 13f1294a87a53d54f82feec56acbfd03f50667a9
 git -C "$src" checkout --detach 13f1294a87a53d54f82feec56acbfd03f50667a9
 rustup target add aarch64-linux-android
-export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android$api-clang"
+. "$(dirname "$0")/ndk_prebuilt.sh"
+prebuilt=$(ndk_prebuilt "$ndk") || { echo "No NDK host prebuilt under $ndk" >&2; exit 1; }
+export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$prebuilt/bin/aarch64-linux-android$api-clang"
 export CC_aarch64_linux_android="$CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER"
-export AR_aarch64_linux_android="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+export AR_aarch64_linux_android="$prebuilt/bin/llvm-ar"
 cargo build --manifest-path "$src/Cargo.toml" --locked --release --target aarch64-linux-android \
     --target-dir "$root/out/android-bionic/orbis-cargo" -p orbis-pkg-util
 mkdir -p "$root/out/android-bionic/bin"
