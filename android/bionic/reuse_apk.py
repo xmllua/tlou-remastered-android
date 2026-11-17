@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # These exact source changes do not alter any native binary. Only the
 # known executable patch table may replace one source member in tools.zip.
 PREPARER_SOURCES = {"android/tlou_patches.py"}
-PACKAGING_ONLY = {"android/bionic/reuse_apk.py", ".github/workflows/tlou-native-apk.yml", "android/tests/test_launcher_reuse.py",
+PACKAGING_ONLY = {".gitmodules", "android/bionic/reuse_apk.py", ".github/workflows/tlou-native-apk.yml", "android/tests/test_launcher_reuse.py",
                   "android/tests/test_submesh_bounds.py", "android/tests/test_tlou_patches.py",
                   "android/STATIC_SUBMESH_CRASH_20261106.md"}
 
