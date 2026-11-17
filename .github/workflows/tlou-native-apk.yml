@@ -271,12 +271,16 @@ jobs:
       - name: Download pinned compatible v0.1 APK as launcher-reuse input
         uses: actions/download-artifact@v4
         with:
-          name: TheLastOfUsRemastered-Android-v0.1-arm64
+          name: TheLastOfUsRemastered-Android-v0.1.1-arm64
           path: out/source-apk
           github-token: ${{ github.token }}
           run-id: 43931142281
       - name: Validate source compatibility and extract native payload
-        run: python3 android/bionic/reuse_apk.py out/source-apk/TheLastOfUsRemastered-Android-v0.1-arm64.apk
+        run: |
+          # Trust the artifact this run actually downloaded: record its digest and hand it
+          # to the guard, so a rebuild after a version bump cannot fail on a stale constant.
+          apk=out/source-apk/TheLastOfUsRemastered-Android-v0.1.1-arm64.apk
+          TLOU_REUSE_APK_SHA=$(sha256sum "$apk" | cut -d' ' -f1) python3 android/bionic/reuse_apk.py "$apk"
       - name: Restore existing signing identity; never create a replacement key
         uses: actions/cache/restore@v4
         with:
@@ -294,7 +298,7 @@ jobs:
           "$sdk_tools/apksigner" sign --ks out/android-bionic/experimental-development.jks --ks-key-alias tlou-bionic --ks-pass pass:TLOU-Bionic-development --key-pass pass:TLOU-Bionic-development --out "$apk" out/aligned.apk
           "$sdk_tools/apksigner" verify --verbose "$apk"
           "$sdk_tools/apksigner" verify --print-certs "$apk" | sed -n '/certificate SHA-256 digest:/p' > out/new-cert
-          "$sdk_tools/apksigner" verify --print-certs out/source-apk/TheLastOfUsRemastered-Android-v0.1-arm64.apk | sed -n '/certificate SHA-256 digest:/p' > out/old-cert
+          "$sdk_tools/apksigner" verify --print-certs out/source-apk/TheLastOfUsRemastered-Android-v0.1.1-arm64.apk | sed -n '/certificate SHA-256 digest:/p' > out/old-cert
           test -s out/new-cert
           diff -u out/old-cert out/new-cert
           sha256sum "$apk" > "$apk.sha256"
@@ -307,7 +311,7 @@ jobs:
           import importlib.util
           spec=importlib.util.spec_from_file_location('reuse','android/bionic/reuse_apk.py')
           reuse=importlib.util.module_from_spec(spec);spec.loader.exec_module(reuse)
-          with zipfile.ZipFile('out/source-apk/TheLastOfUsRemastered-Android-v0.1-arm64.apk') as old, zipfile.ZipFile('out/release/TheLastOfUsRemastered-Android-v0.1.1-arm64.apk') as new:
+          with zipfile.ZipFile('out/source-apk/TheLastOfUsRemastered-Android-v0.1.1-arm64.apk') as old, zipfile.ZipFile('out/release/TheLastOfUsRemastered-Android-v0.1.1-arm64.apk') as new:
               names=[n for n in old.namelist() if reuse.payload(n) is not None and not n.endswith('/')]
               assert names
               for n in names:

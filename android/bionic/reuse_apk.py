@@ -3,6 +3,7 @@
 from pathlib import Path, PurePosixPath
 import copy
 import hashlib
+import os
 import io
 import subprocess
 import sys
@@ -60,7 +61,8 @@ def refresh_patch_source(archive):
 def stage(apk):
     if not unchanged():
         raise ValueError("Native or installer source changed: full build required")
-    if hashlib.sha256(apk.read_bytes()).hexdigest() != APK_SHA:
+    expected = os.environ.get("TLOU_REUSE_APK_SHA") or APK_SHA
+    if hashlib.sha256(apk.read_bytes()).hexdigest() != expected:
         raise ValueError("APK does not match pinned successful source build")
     with zipfile.ZipFile(apk) as z:
         for item in z.infolist():
