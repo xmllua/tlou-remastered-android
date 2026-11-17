@@ -8,13 +8,13 @@ import subprocess
 import sys
 import zipfile
 
-BASE = "0916e9f78d3ed1fc5b4747f4c2846da40d4d8761"
-APK_SHA = "43f9543decfd3d5f9a717937e0404f320ec853fe0c1add242c55fae32316c6cb"
+BASE = "ea5f117326e5ef6eafe8d05b0c58f2a9718b9120"
+APK_SHA = "236302fae6a064a950e4d1f195446dca9a46b417e94fb7933887461958d3f663"
 ROOT = Path(__file__).resolve().parents[2]
 # These exact source changes do not alter any native binary. Only the
 # known executable patch table may replace one source member in tools.zip.
 PREPARER_SOURCES = {"android/tlou_patches.py"}
-PACKAGING_ONLY = {"android/bionic/reuse_apk.py", "android/tests/test_launcher_reuse.py",
+PACKAGING_ONLY = {"android/bionic/reuse_apk.py", ".github/workflows/tlou-native-apk.yml", "android/tests/test_launcher_reuse.py",
                   "android/tests/test_submesh_bounds.py", "android/tests/test_tlou_patches.py",
                   "android/STATIC_SUBMESH_CRASH_20261106.md"}
 
